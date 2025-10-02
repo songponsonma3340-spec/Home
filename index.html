@@ -1,0 +1,393 @@
+<!doctype html>
+
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Manager Dorm - ระบบจัดการค่าน้ำ-ไฟ (Pro All-in-One)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#f4f6fb;--card:#fff;--muted:#6b7280;--accent:#2563eb;--accent-2:#06b6d4;--success:#16a34a;--danger:#ef4444}
+    *{box-sizing:border-box;font-family:'Prompt',sans-serif}
+    body{margin:0;background:var(--bg);color:#0f172a;padding:22px}
+    .app{max-width:1200px;margin:auto}
+    header{display:flex;gap:16px;align-items:center}
+    h1{font-size:20px;margin:0}
+    .top-actions{margin-left:auto;display:flex;gap:8px}
+    button{background:var(--accent);color:white;border:0;padding:8px 12px;border-radius:10px;cursor:pointer}
+    button.ghost{background:transparent;color:var(--accent);border:1px solid rgba(37,99,235,.12)}
+    .layout{display:grid;grid-template-columns:320px 1fr;gap:18px;margin-top:18px}
+    .panel{background:var(--card);padding:16px;border-radius:12px;box-shadow:0 6px 18px rgba(12,20,40,.06)}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input,select{width:100%;padding:8px;border-radius:8px;border:1px solid #e6edf6}
+    .small{font-size:13px;color:var(--muted)}
+    .room-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+    .room-card{background:linear-gradient(180deg,#fff,#fbfdff);padding:12px;border-radius:12px;border:1px solid rgba(2,6,23,.04)}
+    .room-card h3{margin:0 0 6px 0}
+    .row{display:flex;gap:8px;align-items:center}
+    .chip{padding:6px 8px;border-radius:999px;font-size:13px}
+    .chip.paid{background:rgba(16,185,129,.12);color:var(--success)}
+    .chip.unpaid{background:rgba(239,68,68,.08);color:var(--danger)}
+    .actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+    .muted{color:var(--muted)}
+    footer{margin-top:18px;text-align:center;color:var(--muted)}/* responsive */
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+
+/* toast */
+.toast-wrap{position:fixed;right:20px;bottom:20px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast{background:#0f172a;color:white;padding:10px 12px;border-radius:10px;opacity:.98}
+
+/* modal */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(2,6,23,.45);align-items:center;justify-content:center;padding:20px;z-index:999}
+.modal{background:white;border-radius:12px;padding:16px;max-width:760px;width:100%;box-shadow:0 10px 30px rgba(2,6,23,.12)}
+
+/* invoice preview */
+.invoice-preview{background:white;padding:12px;border-radius:12px;border:1px solid #eef2ff}
+
+/* search */
+.search{display:flex;gap:8px}
+.search input{flex:1}
+
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Manager Dorm — ระบบคำนวณค่าน้ำ-ไฟ (Pro)</h1>
+        <div class="small">ครบทั้งเพิ่มห้อง, สถิติ, พิมพ์/ดาวน์โหลด PDF, Excel, Backup/Restore, QR-pay, ส่งอีเมล</div>
+      </div>
+      <div class="top-actions">
+        <input id="globalSearch" placeholder="ค้นหาเลขห้อง/ชื่อ" />
+        <button id="openSettings">ตั้งค่าอัตรา</button>
+        <button id="backupBtn" class="ghost">สำรองข้อมูล</button>
+        <button id="restoreBtn" class="ghost">กู้คืน</button>
+        <button id="exportXls" class="ghost">Export Excel</button>
+      </div>
+    </header><div class="layout">
+  <aside class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div class="small">สรุป</div>
+        <div style="margin-top:6px"><strong id="summaryTotal">0 ห้อง</strong><div class="small" id="summaryUnpaid">0 ค้างจ่าย</div></div>
+      </div>
+      <div class="muted">จัดเก็บข้อมูลบนเครื่อง (localStorage)</div>
+    </div>
+
+    <hr style="margin:12px 0;border:none;border-top:1px solid #eef2ff"/>
+
+    <div>
+      <label>เพิ่ม/แก้ไขห้อง</label>
+      <input id="roomId" type="hidden" />
+      <input id="roomName" placeholder="เลขห้อง / ชื่อผู้เช่า (เช่น 101 - นายเอ)" />
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        <input id="elBefore" type="number" placeholder="มิเตอร์ไฟ ก่อน" />
+        <input id="elAfter" type="number" placeholder="มิเตอร์ไฟ หลัง" />
+        <input id="waBefore" type="number" placeholder="มิเตอร์น้ำ ก่อน" />
+        <input id="waAfter" type="number" placeholder="มิเตอร์น้ำ หลัง" />
+      </div>
+
+      <label style="margin-top:8px">ค่าบริการเพิ่มเติม</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <input id="feeInternet" type="number" placeholder="อินเทอร์เน็ต" />
+        <input id="feeClean" type="number" placeholder="ค่าทำความสะอาด" />
+        <input id="feePark" type="number" placeholder="ค่าที่จอดรถ" />
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button id="saveRoomBtn">บันทึก</button>
+        <button id="resetForm" class="ghost">ล้างฟอร์ม</button>
+      </div>
+    </div>
+
+    <hr style="margin:12px 0;border:none;border-top:1px solid #eef2ff"/>
+
+    <div>
+      <label>Filter</label>
+      <select id="filterSelect">
+        <option value="all">ทั้งหมด</option>
+        <option value="paid">ชำระแล้ว</option>
+        <option value="unpaid">ยังไม่ชำระ</option>
+      </select>
+      <div style="margin-top:8px">
+        <label>Month / Year</label>
+        <input id="monthPicker" type="month" />
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div>
+          <div class="small">รายการห้อง</div>
+          <div class="muted">คลิกปุ่มเพื่อพิมพ์, ดาวน์โหลด PDF, ส่งอีเมล, หรือสร้าง QR-Pay</div>
+        </div>
+        <div class="row">
+          <button id="toggleTheme" class="ghost">Toggle Theme</button>
+          <button id="printAll" class="ghost">พิมพ์ทั้งหมด</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+        <canvas id="summaryChart" style="max-width:360px;flex:0 0 360px"></canvas>
+        <div style="flex:1">
+          <div style="display:flex;gap:8px;justify-content:space-between;align-items:center">
+            <div class="small">ยอดรวมเดือนนี้</div>
+            <div><strong id="monthTotal">0 ฿</strong></div>
+          </div>
+          <div style="margin-top:8px">
+            <div class="invoice-preview" id="quickPreview">ตัวอย่างใบแจ้งหนี้จะแสดงเมื่อเลือกห้อง</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="roomList" class="room-list"></div>
+    </div>
+  </main>
+</div>
+
+<footer class="small">สร้างโดย Manager Dorm • รองรับการ Export PDF / XLSX / Backup</footer>
+
+<!-- toasts -->
+<div id="toasts" class="toast-wrap"></div>
+
+<!-- modal backdrop -->
+<div id="modal" class="modal-backdrop"><div class="modal"></div></div>
+
+  </div>  <!-- Libraries -->  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>  <!-- EmailJS (optional) - configure your user id & template in settings panel after deploy -->  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>  <script>
+    // -- Data & persistence --
+    const LS_ROOMS = 'md.rooms.v2';
+    const LS_SETTINGS = 'md.settings.v2';
+    let rooms = JSON.parse(localStorage.getItem(LS_ROOMS) || '[]');
+    let settings = JSON.parse(localStorage.getItem(LS_SETTINGS) || JSON.stringify({
+      rateElectric: 4.0, rateWater: 20.0, otherDefault:0,
+      dormName:'หอพักตัวอย่าง', ownerEmail:'', emailjs_user:'', emailjs_service:'', emailjs_template:''
+    }));
+
+    // -- helpers --
+    function saveAll(){ localStorage.setItem(LS_ROOMS, JSON.stringify(rooms)); localStorage.setItem(LS_SETTINGS, JSON.stringify(settings)); }
+    function toast(txt, t=2200){ const el = document.createElement('div'); el.className='toast'; el.textContent=txt; document.getElementById('toasts').appendChild(el); setTimeout(()=>el.remove(),t); }
+
+    // -- initial UI binds --
+    const roomListEl = document.getElementById('roomList');
+    const summaryTotal = document.getElementById('summaryTotal');
+    const summaryUnpaid = document.getElementById('summaryUnpaid');
+    const globalSearch = document.getElementById('globalSearch');
+
+    function calcRoom(r){
+      const eUsage = (Number(r.elAfter)||0) - (Number(r.elBefore)||0);
+      const wUsage = (Number(r.waAfter)||0) - (Number(r.waBefore)||0);
+      const elec = Math.max(0,eUsage) * (settings.rateElectric||0);
+      const water = Math.max(0,wUsage) * (settings.rateWater||0);
+      const other = (Number(r.feeInternet)||0) + (Number(r.feeClean)||0) + (Number(r.feePark)||0) + (Number(r.other||0));
+      const total = Math.round((elec + water + other) * 100)/100;
+      return {eUsage,wUsage,elec,water,other,total};
+    }
+
+    // -- render rooms --
+    function renderRooms(){
+      const q = (globalSearch.value||'').trim().toLowerCase();
+      const filter = document.getElementById('filterSelect').value;
+      roomListEl.innerHTML = '';
+      let unpaid=0;
+      let monthSum=0;
+      rooms.forEach((r,idx)=>{
+        if(q && !(r.name||'').toLowerCase().includes(q)) return;
+        const paid = r.paid === true || r.paid === 'true';
+        if(filter==='paid' && !paid) return; if(filter==='unpaid' && paid) return;
+        const c = calcRoom(r);
+        monthSum += c.total;
+        const card = document.createElement('div'); card.className='room-card';
+        let statusHtml = `<span class='chip ${paid? 'paid':'unpaid'}'>${paid? 'ชำระแล้ว':'ยังไม่ชำระ'}</span>`;
+        card.innerHTML = `<h3>${r.name||('ห้อง '+(idx+1))}</h3>
+          <div class='small'>ไฟ: ${c.eUsage} หน่วย (${c.elec} บ.) · น้ำ: ${c.wUsage} หน่วย (${c.water} บ.)</div>
+          <div class='muted small'>อื่นๆ: ${c.other} บ. | <strong>รวม: ${c.total} บ.</strong></div>
+          <div style='margin-top:8px'>${statusHtml}</div>
+        `;
+        const actions = document.createElement('div'); actions.className='actions';
+        const btnEdit = document.createElement('button'); btnEdit.textContent='แก้ไข'; btnEdit.className='ghost'; btnEdit.onclick = ()=>openEdit(idx);
+        const btnPay = document.createElement('button'); btnPay.textContent = paid? 'ยกเลิกชำระ':'จ่ายแล้ว'; btnPay.onclick = ()=>togglePaid(idx);
+        const btnPdf = document.createElement('button'); btnPdf.textContent='ดาวน์โหลด PDF'; btnPdf.onclick = ()=>downloadPDF(idx);
+        const btnPrint = document.createElement('button'); btnPrint.textContent='พิมพ์ใบแจ้งหนี้'; btnPrint.className='ghost'; btnPrint.onclick = ()=>printInvoice(idx);
+        const btnXls = document.createElement('button'); btnXls.textContent='Export XLS'; btnXls.className='ghost'; btnXls.onclick = ()=>exportSingleXLS(idx);
+        const btnQR = document.createElement('button'); btnQR.textContent='QR-Pay'; btnQR.className='ghost'; btnQR.onclick = ()=>openQR(idx);
+        const btnEmail = document.createElement('button'); btnEmail.textContent='ส่งอีเมล'; btnEmail.className='ghost'; btnEmail.onclick = ()=>sendEmailInvoice(idx);
+        const btnDelete = document.createElement('button'); btnDelete.textContent='ลบ'; btnDelete.className='ghost'; btnDelete.onclick = ()=>{ if(confirm('ลบห้องจริงหรือ?')){ rooms.splice(idx,1); saveAll(); renderRooms(); toast('ลบแล้ว'); }};
+        actions.append(btnEdit,btnPay,btnPdf,btnPrint,btnXls,btnQR,btnEmail,btnDelete);
+        card.appendChild(actions);
+        roomListEl.appendChild(card);
+        if(!paid) unpaid++;
+      });
+      summaryTotal.textContent = rooms.length + ' ห้อง'; summaryUnpaid.textContent = unpaid + ' ค้างจ่าย';
+      document.getElementById('monthTotal').textContent = monthSum + ' ฿';
+      updateChart();
+    }
+
+    // -- edit/create room --
+    document.getElementById('saveRoomBtn').addEventListener('click', ()=>{
+      const id = document.getElementById('roomId').value;
+      const data = {
+        name: document.getElementById('roomName').value,
+        elBefore: Number(document.getElementById('elBefore').value)||0,
+        elAfter: Number(document.getElementById('elAfter').value)||0,
+        waBefore: Number(document.getElementById('waBefore').value)||0,
+        waAfter: Number(document.getElementById('waAfter').value)||0,
+        feeInternet: Number(document.getElementById('feeInternet').value)||0,
+        feeClean: Number(document.getElementById('feeClean').value)||0,
+        feePark: Number(document.getElementById('feePark').value)||0,
+        other:0,
+        paid:false,
+        createdAt: new Date().toISOString()
+      };
+      if(id){ rooms[Number(id)] = Object.assign(rooms[Number(id)], data); toast('บันทึกการแก้ไข'); }
+      else { rooms.push(data); toast('เพิ่มห้องแล้ว'); }
+      saveAll(); clearForm(); renderRooms();
+    });
+    document.getElementById('resetForm').addEventListener('click', clearForm);
+    function clearForm(){ document.getElementById('roomId').value=''; document.getElementById('roomName').value=''; ['elBefore','elAfter','waBefore','waAfter','feeInternet','feeClean','feePark'].forEach(id=>document.getElementById(id).value=''); }
+    function openEdit(i){ const r=rooms[i]; document.getElementById('roomId').value=i; document.getElementById('roomName').value=r.name||''; document.getElementById('elBefore').value=r.elBefore||0; document.getElementById('elAfter').value=r.elAfter||0; document.getElementById('waBefore').value=r.waBefore||0; document.getElementById('waAfter').value=r.waAfter||0; document.getElementById('feeInternet').value=r.feeInternet||0; document.getElementById('feeClean').value=r.feeClean||0; document.getElementById('feePark').value=r.feePark||0; }
+    function togglePaid(i){ rooms[i].paid = !rooms[i].paid; saveAll(); renderRooms(); toast('อัปเดตสถานะ'); }
+
+    // -- settings modal --
+    document.getElementById('openSettings').addEventListener('click', ()=>{
+      showModal(`<h3>ตั้งค่าอัตรา & EmailJS</h3>
+        <label>ชื่อหอพัก</label><input id='s_dormName' value='${settings.dormName || ''}' />
+        <label>ราคาค่าไฟต่อหน่วย (บาท)</label><input id='s_rateE' type='number' value='${settings.rateElectric}' />
+        <label>ราคาค่าน้ำต่อหน่วย (บาท)</label><input id='s_rateW' type='number' value='${settings.rateWater}' />
+        <label>ค่าอื่นๆ ที่ต้องบวกต่อห้อง (บาท)</label><input id='s_other' type='number' value='${settings.otherDefault}' />
+        <hr>
+        <h4>ตั้งค่า Email (ถ้าต้องการส่งอีเมล)</h4>
+        <label>Email ของเจ้าของ/จาก</label><input id='s_ownerEmail' value='${settings.ownerEmail||''}' />
+        <label>emailjs_user (User ID)</label><input id='s_emailUser' value='${settings.emailjs_user||''}' />
+        <label>emailjs_service</label><input id='s_emailService' value='${settings.emailjs_service||''}' />
+        <label>emailjs_template</label><input id='s_emailTemplate' value='${settings.emailjs_template||''}' />
+        <div style='display:flex;gap:8px;justify-content:flex-end;margin-top:12px'><button id='saveSettingsBtn'>บันทึก</button><button id='closeModal' class='ghost'>ยกเลิก</button></div>`);
+      document.getElementById('saveSettingsBtn').addEventListener('click', ()=>{
+        settings.dormName = document.getElementById('s_dormName').value;
+        settings.rateElectric = Number(document.getElementById('s_rateE').value)||0;
+        settings.rateWater = Number(document.getElementById('s_rateW').value)||0;
+        settings.otherDefault = Number(document.getElementById('s_other').value)||0;
+        settings.ownerEmail = document.getElementById('s_ownerEmail').value;
+        settings.emailjs_user = document.getElementById('s_emailUser').value;
+        settings.emailjs_service = document.getElementById('s_emailService').value;
+        settings.emailjs_template = document.getElementById('s_emailTemplate').value;
+        saveAll(); closeModal(); toast('บันทึกการตั้งค่า'); renderRooms();
+      });
+    });
+
+    // -- modal helpers --
+    function showModal(html){ document.getElementById('modal').style.display='flex'; document.querySelector('#modal .modal').innerHTML = html; document.getElementById('modal').querySelector('#closeModal')?.addEventListener('click', closeModal); }
+    function closeModal(){ document.getElementById('modal').style.display='none'; document.querySelector('#modal .modal').innerHTML=''; }
+
+    // -- invoice (print & pdf) --
+    function invoiceHtml(i){ const r=rooms[i]; const c=calcRoom(r); const today = new Date().toLocaleDateString('th-TH'); return `
+      <div style='font-family:Prompt,Arial;max-width:720px;padding:18px;color:#0f172a'>
+        <div style='display:flex;justify-content:space-between;align-items:center'>
+          <div>
+            <h2 style='margin:0'>${settings.dormName || 'หอพัก'}</h2>
+            <div class='small'>ที่อยู่: -</div>
+          </div>
+          <div style='text-align:right'><div class='small'>วันที่: ${today}</div><h3>ใบแจ้งหนี้</h3></div>
+        </div>
+        <hr>
+        <div>ห้อง: <strong>${r.name}</strong></div>
+        <table style='width:100%;margin-top:12px;border-collapse:collapse'>
+          <tr><td>ไฟ (${c.eUsage} หน่วย)</td><td style='text-align:right'>${c.elec} ฿</td></tr>
+          <tr><td>น้ำ (${c.wUsage} หน่วย)</td><td style='text-align:right'>${c.water} ฿</td></tr>
+          <tr><td>ค่าอินเทอร์เน็ต</td><td style='text-align:right'>${r.feeInternet} ฿</td></tr>
+          <tr><td>ค่าทำความสะอาด</td><td style='text-align:right'>${r.feeClean} ฿</td></tr>
+          <tr><td>ค่าที่จอดรถ</td><td style='text-align:right'>${r.feePark} ฿</td></tr>
+          <tr><th style='text-align:left'>รวม</th><th style='text-align:right'>${c.total} ฿</th></tr>
+        </table>
+        <div style='margin-top:14px'>สถานะ: <strong>${r.paid? 'ชำระแล้ว':'ยังไม่ชำระ'}</strong></div>
+      </div>` }
+
+    async function printInvoice(i){ const w = window.open('','_blank'); w.document.write(invoiceHtml(i)); w.document.close(); w.focus(); }
+
+    async function downloadPDF(i){ // render invoice to canvas then save via jsPDF
+      const html = invoiceHtml(i);
+      const wrapper = document.createElement('div'); wrapper.style.padding='20px'; wrapper.innerHTML = html; document.body.appendChild(wrapper);
+      const canvas = await html2canvas(wrapper, {scale:2});
+      const imgData = canvas.toDataURL('image/png');
+      document.body.removeChild(wrapper);
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({unit:'px',format:[canvas.width,canvas.height]});
+      doc.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      const filename = `Invoice_${rooms[i].name.replace(/\s+/g,'_')}.pdf`;
+      doc.save(filename);
+      toast('ดาวน์โหลด PDF แล้ว');
+    }
+
+    // -- QR Pay modal --
+    function openQR(i){ const r=rooms[i]; const c=calcRoom(r); showModal(`<h3>QR-Pay สำหรับ ${r.name}</h3><div id='qrcode'></div><div class='small'>ยอด: ${c.total} ฿</div><div style='display:flex;gap:8px;justify-content:flex-end;margin-top:12px'><button id='closeModal'>ปิด</button></div>`); new QRCode(document.getElementById('qrcode'), {text:`PAY:${c.total}`,width:200,height:200}); }
+
+    // -- export single xls --
+    function exportSingleXLS(i){ const r=rooms[i]; const c=calcRoom(r); const ws = XLSX.utils.json_to_sheet([
+      {รายการ:'ไฟ (บาท)',จำนวน:c.elec},{รายการ:'น้ำ (บาท)',จำนวน:c.water},{รายการ:'รวม (บาท)',จำนวน:c.total}
+    ]);
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Invoice'); XLSX.writeFile(wb,`Invoice_${r.name}.xlsx`); toast('ดาวน์โหลด Excel แล้ว'); }
+
+    // -- export all xls --
+    document.getElementById('exportXls').addEventListener('click', ()=>{
+      const arr = rooms.map(r=>{ const c=calcRoom(r); return {room:r.name,electric:c.elec,water:c.water,other:c.other,total:c.total,paid:r.paid}; });
+      const ws = XLSX.utils.json_to_sheet(arr); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Rooms'); XLSX.writeFile(wb,'Dorm_Export.xlsx'); toast('Export Excel เรียบร้อย');
+    });
+
+    // -- export backup/restore --
+    document.getElementById('backupBtn').addEventListener('click', ()=>{
+      const data = {rooms,settings,createdAt:new Date().toISOString()}; const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download = 'dorm-backup-'+new Date().toISOString().slice(0,10)+'.json'; a.click(); toast('ดาวน์โหลดไฟล์ Backup');
+    });
+    document.getElementById('restoreBtn').addEventListener('click', ()=>{ // create file input
+      const inp = document.createElement('input'); inp.type='file'; inp.accept='application/json'; inp.onchange = ()=>{
+        const f = inp.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const d = JSON.parse(r.result); if(Array.isArray(d.rooms)) rooms = d.rooms; if(d.settings) settings = d.settings; saveAll(); renderRooms(); toast('กู้คืนข้อมูลสำเร็จ'); }catch(e){alert('ไฟล์ไม่ถูกต้อง')} }; r.readAsText(f); }; inp.click();
+    });
+
+    // -- search/filter handlers --
+    globalSearch.addEventListener('input', renderRooms); document.getElementById('filterSelect').addEventListener('change', renderRooms); document.getElementById('monthPicker').addEventListener('change', renderRooms);
+
+    // -- Chart --
+    const ctx = document.getElementById('summaryChart').getContext('2d'); let chart = null;
+    function updateChart(){
+      // simple: show top 6 room totals
+      const data = rooms.map((r,i)=>({name:r.name||('R'+i),total:calcRoom(r).total})).sort((a,b)=>b.total-a.total).slice(0,6);
+      const labels = data.map(d=>d.name); const values = data.map(d=>d.total);
+      if(chart) chart.destroy(); chart = new Chart(ctx,{type:'bar',data:{labels, datasets:[{label:'ยอด (฿)',data:values}]}, options:{plugins:{legend:{display:false}}}});
+    }
+
+    // -- print all invoices --
+    document.getElementById('printAll').addEventListener('click', ()=>{
+      const w = window.open('','_blank'); let html=''; rooms.forEach((r,i)=>{ html += invoiceHtml(i) + '<div style="page-break-after:always"></div>'; }); w.document.write(html); w.document.close(); w.focus();
+    });
+
+    // -- export single invoice via EmailJS --
+    async function sendEmailInvoice(i){ if(!settings.emailjs_user || !settings.emailjs_service || !settings.emailjs_template){ alert('ยังไม่ได้ตั้งค่า EmailJS ใน Settings'); return }
+      // generate pdf blob
+      const html = invoiceHtml(i); const wrapper = document.createElement('div'); wrapper.style.padding='20px'; wrapper.innerHTML = html; document.body.appendChild(wrapper); const canvas = await html2canvas(wrapper, {scale:2}); const img = canvas.toDataURL('image/png'); document.body.removeChild(wrapper);
+      const { jsPDF } = window.jspdf; const doc=new jsPDF({unit:'px',format:[canvas.width,canvas.height]}); doc.addImage(img,'PNG',0,0,canvas.width,canvas.height); const pdfBase64 = doc.output('datauristring');
+      // init emailjs and send
+      emailjs.init(settings.emailjs_user);
+      const templateParams = { to_email: settings.ownerEmail, room: rooms[i].name, pdf: pdfBase64 };
+      try{ await emailjs.send(settings.emailjs_service, settings.emailjs_template, templateParams); toast('ส่งอีเมลเรียบร้อย'); }catch(e){console.error(e); alert('ส่งอีเมลล้มเหลว') }
+    }
+
+    // -- save on unload --
+    window.addEventListener('beforeunload', saveAll);
+
+    // -- theme toggle (simple) --
+    let dark=false; document.getElementById('toggleTheme').addEventListener('click', ()=>{ dark=!dark; document.body.style.background = dark? '#0b1220': 'var(--bg)'; document.body.style.color = dark? '#e6eef8':'#0f172a'; toast('สลับธีมแล้ว'); });
+
+    // -- utils: export single room to xlsx
+    function exportSingleXLS(i){ const r=rooms[i]; const c=calcRoom(r); const arr=[{รายการ:'ไฟ',จำนวน:c.elec},{รายการ:'น้ำ',จำนวน:c.water},{รายการ:'อื่นๆ',จำนวน:c.other},{รายการ:'รวม',จำนวน:c.total}]; const ws=XLSX.utils.json_to_sheet(arr); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Invoice'); XLSX.writeFile(wb,`Invoice_${r.name}.xlsx`); }
+
+    // -- quick preview update when selecting first room --
+    function updateQuickPreview(i=0){ if(!rooms[i]){ document.getElementById('quickPreview').innerHTML='เลือกห้องเพื่อดูตัวอย่างใบแจ้งหนี้'; return } document.getElementById('quickPreview').innerHTML = invoiceHtml(i); }
+
+    // -- init demo data if empty --
+    if(rooms.length===0){ rooms.push({name:'101 - นายสมชาย',elBefore:120,elAfter:150,waBefore:40,waAfter:44,feeInternet:200,feeClean:0,feePark:0,paid:false}); rooms.push({name:'102 - นางสาวมิน',elBefore:200,elAfter:230,waBefore:10,waAfter:14,feeInternet:150,feeClean:100,feePark:0,paid:true}); }
+    renderRooms(); updateQuickPreview();
+
+    // expose some funcs for console debugging
+    window._md = {rooms,settings,saveAll,renderRooms,downloadPDF,printInvoice};
+  </script></body>
+</html>
